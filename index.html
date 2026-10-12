@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R Trading — Coming soon</title>
+<meta name="description" content="R Trading — discretionary and algorithmic trading across index futures, metals and currencies. Coming soon.">
+<script>
+  // Opt into the load sequence before first paint; reduced-motion users get the static final state.
+  if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    document.documentElement.classList.add('anim');
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&amp;family=Syne:wght@600;700;800&amp;family=DM+Sans:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070D1A}
+h1,h2,h3{font-family:'Syne',system-ui,sans-serif}
+a{color:#EEF2F8}a:hover{color:#AFFC41}
+
+/* ---------- Load sequence ---------- */
+@keyframes fx-fade { to { opacity: 1; } }
+@keyframes fx-up { to { opacity: 1; transform: none; } }
+@keyframes fx-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes fx-ring {
+  0%   { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(7); }
+}
+@keyframes fx-label {
+  0%   { opacity: 0; transform: translateY(6px); }
+  12%  { opacity: 1; transform: none; }
+  78%  { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: none; }
+}
+
+/* Background layers fade up under the price line */
+.anim .fx-dots  { opacity: 0; animation: fx-fade 900ms ease-out forwards; }
+.anim .fx-glow  { opacity: 0; animation: fx-fade 1400ms ease-out 100ms forwards; }
+.anim .fx-wave2 { opacity: 0; animation: fx-fade 1100ms ease-out 300ms forwards; }
+.anim .fx-wave  { visibility: hidden; }
+.anim .fx-wave.is-live { visibility: visible; }
+
+/* Hero copy (the h1 is left alone so it paints immediately) */
+.anim .fx-in {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fx-up 700ms cubic-bezier(.2,.7,.2,1) var(--d, 0ms) forwards;
+}
+
+/* Fills on the price line */
+.fx-core, .fx-halo, .fx-ring { transform-box: fill-box; transform-origin: center; }
+.fx-ring { opacity: 0; }
+.fx-label { opacity: 0; }
+.anim .fx-core, .anim .fx-halo { transform: scale(0); }
+.fx-node.is-filled .fx-core  { animation: fx-pop 440ms cubic-bezier(.3,1.7,.5,1) forwards; }
+.fx-node.is-filled .fx-halo  { animation: fx-pop 640ms cubic-bezier(.2,.9,.3,1) 60ms forwards; }
+.fx-node.is-filled .fx-ring  { animation: fx-ring 900ms cubic-bezier(.1,.6,.3,1) forwards; }
+.fx-node.is-filled .fx-ring + .fx-ring { animation-delay: 160ms; }
+.fx-node.is-filled .fx-label { animation: fx-label 2800ms ease 120ms forwards; }
+
+/* Logo written by code rain on a canvas, then the real SVG takes over */
+.fx-logo { position: relative; }
+.anim .fx-logo-svg { opacity: 0; }
+.anim .fx-logo-svg.is-ready { opacity: 1; transition: opacity 260ms ease; }
+
+/* Contact form (Netlify Forms) on the green band */
+.rt-form { flex: 1 1 360px; max-width: 480px; display: flex; flex-direction: column; gap: 12px; }
+.rt-form__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+.rt-form label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 500; color: #0B2A18; }
+.rt-form input, .rt-form textarea {
+  font: inherit; font-size: 16px; color: #070D1A;
+  background: rgba(255,255,255,0.38); border: 1px solid rgba(7,13,26,0.18); border-radius: 12px;
+  padding: 13px 16px; min-height: 48px; box-sizing: border-box; width: 100%;
+}
+.rt-form textarea { min-height: 112px; resize: vertical; }
+.rt-form input::placeholder, .rt-form textarea::placeholder { color: rgba(11,42,24,0.55); }
+.rt-form input:focus, .rt-form textarea:focus { outline: 2px solid #070D1A; outline-offset: 1px; background: rgba(255,255,255,0.55); }
+.rt-form button {
+  align-self: flex-start; font: inherit; font-weight: 600; font-size: 17px; cursor: pointer;
+  background: #070D1A; color: #EEF2F8; border: 0; border-radius: 999px; padding: 18px 30px; min-height: 44px;
+}
+.rt-form button:hover { background: #0B1428; }
+.rt-form button:disabled { opacity: 0.6; cursor: progress; }
+.rt-form__honeypot { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.rt-form__status { margin: 0; font-size: 15px; color: #0B2A18; }
+.rt-form__status:empty { display: none; }
+.rt-form__done { flex: 1 1 360px; max-width: 480px; display: flex; flex-direction: column; gap: 8px; }
+.rt-form__done p { margin: 0; }
+</style>
+</head>
+<body>
+<div style="background: linear-gradient(180deg, #070D1A 0%, #0B1428 55%, #070D1A 100%); color: #EEF2F8; font-family: 'DM Sans', system-ui, sans-serif; min-height: 100vh; width: 100%;">
+
+  <section id="top" style="position: relative; overflow: hidden; min-height: 860px; display: flex; flex-direction: column;">
+
+    <!-- Abstract background: a price line with volatility bands and two fills -->
+    <svg id="hero-art" aria-hidden="true" viewBox="0 0 1440 860" preserveAspectRatio="xMidYMid slice" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;">
+      <defs>
+        <radialGradient id="glowA" cx="0.72" cy="0.42" r="0.55">
+          <stop offset="0" stop-color="#7AF04E" stop-opacity="0.30"></stop>
+          <stop offset="0.45" stop-color="#0F3A2A" stop-opacity="0.22"></stop>
+          <stop offset="1" stop-color="#070D1A" stop-opacity="0"></stop>
+        </radialGradient>
+        <radialGradient id="glowB" cx="0.12" cy="0.95" r="0.5">
+          <stop offset="0" stop-color="#12B06A" stop-opacity="0.18"></stop>
+          <stop offset="1" stop-color="#070D1A" stop-opacity="0"></stop>
+        </radialGradient>
+        <linearGradient id="fadeBottom" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0.7" stop-color="#070D1A" stop-opacity="0"></stop>
+          <stop offset="1" stop-color="#070D1A" stop-opacity="1"></stop>
+        </linearGradient>
+        <!-- userSpaceOnUse so the gradient doesn't stretch while the line grows -->
+        <linearGradient id="waveStroke" gradientUnits="userSpaceOnUse" x1="-80" y1="0" x2="1540" y2="0">
+          <stop offset="0" stop-color="#7AF04E" stop-opacity="0"></stop>
+          <stop offset="0.35" stop-color="#7AF04E" stop-opacity="0.9"></stop>
+          <stop offset="1" stop-color="#2ED85C" stop-opacity="0.8"></stop>
+        </linearGradient>
+        <radialGradient id="tipGlow">
+          <stop offset="0" stop-color="#AFFC41" stop-opacity="0.55"></stop>
+          <stop offset="1" stop-color="#AFFC41" stop-opacity="0"></stop>
+        </radialGradient>
+        <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1" fill="#EEF2F8" fill-opacity="0.07"></circle>
+        </pattern>
+        <path id="waveSrc" d="M-80 640 C 220 610, 380 700, 620 560 S 980 300, 1180 330 S 1440 250, 1540 200"></path>
+        <path id="waveLive" d="M-80 640 C 220 610, 380 700, 620 560 S 980 300, 1180 330 S 1440 250, 1540 200"></path>
+        <path id="wave2" d="M-80 300 C 200 360, 420 260, 700 330 S 1100 520, 1540 440"></path>
+      </defs>
+      <rect width="1440" height="860" fill="#070D1A"></rect>
+      <rect class="fx-dots" width="1440" height="860" fill="url(#dots)"></rect>
+      <g class="fx-glow">
+        <rect width="1440" height="860" fill="url(#glowA)"></rect>
+        <rect width="1440" height="860" fill="url(#glowB)"></rect>
+      </g>
+
+      <g class="fx-wave2" fill="none" stroke="#3E8A55" stroke-width="1">
+        <use href="#wave2" opacity="0.10"></use>
+        <use href="#wave2" transform="translate(0,22)" opacity="0.08"></use>
+        <use href="#wave2" transform="translate(0,44)" opacity="0.06"></use>
+        <use href="#wave2" transform="translate(0,66)" opacity="0.04"></use>
+      </g>
+
+      <!-- Price line + bands. data-k is the band index; spacing is 28px per step. -->
+      <g class="fx-wave" fill="none" stroke="url(#waveStroke)" stroke-linecap="round" stroke-linejoin="round">
+        <use href="#waveLive" data-k="-4" transform="translate(0,-112)" stroke-width="1" opacity="0.10"></use>
+        <use href="#waveLive" data-k="-3" transform="translate(0,-84)" stroke-width="1" opacity="0.16"></use>
+        <use href="#waveLive" data-k="-2" transform="translate(0,-56)" stroke-width="1" opacity="0.24"></use>
+        <use href="#waveLive" data-k="-1" transform="translate(0,-28)" stroke-width="1.2" opacity="0.38"></use>
+        <use href="#waveLive" stroke-width="3" opacity="1"></use>
+        <use href="#waveLive" data-k="1" transform="translate(0,28)" stroke-width="1.2" opacity="0.38"></use>
+        <use href="#waveLive" data-k="2" transform="translate(0,56)" stroke-width="1" opacity="0.24"></use>
+        <use href="#waveLive" data-k="3" transform="translate(0,84)" stroke-width="1" opacity="0.16"></use>
+        <use href="#waveLive" data-k="4" transform="translate(0,112)" stroke-width="1" opacity="0.10"></use>
+        <use href="#waveLive" data-k="5" transform="translate(0,140)" stroke-width="1" opacity="0.06"></use>
+      </g>
+
+      <!-- Fills: entry and target -->
+      <g class="fx-node" data-x="620" data-y="560" transform="translate(620,560)">
+        <line class="fx-drop" x1="0" y1="0" x2="0" y2="300" stroke="#EEF2F8" stroke-opacity="0.18" stroke-dasharray="3 6"></line>
+        <circle class="fx-halo" r="16" fill="#7AF04E" opacity="0.15"></circle>
+        <circle class="fx-ring" r="6" fill="none" stroke="#AFFC41" stroke-width="1.5" vector-effect="non-scaling-stroke"></circle>
+        <circle class="fx-ring" r="6" fill="none" stroke="#AFFC41" stroke-width="1" vector-effect="non-scaling-stroke"></circle>
+        <circle class="fx-core" r="5" fill="#7AF04E"></circle>
+        <g class="fx-label" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="12" letter-spacing="1">
+          <rect x="16" y="14" height="24" rx="6" width="190" fill="#070D1A" fill-opacity="0.72" stroke="#EEF2F8" stroke-opacity="0.14"></rect>
+          <text x="26" y="30"><tspan fill="#AFFC41">FILLED</tspan><tspan fill="#C9D3E4"> · LONG ES 5,412.25</tspan></text>
+        </g>
+      </g>
+      <g class="fx-node" data-x="1180" data-y="330" transform="translate(1180,330)">
+        <line class="fx-drop" x1="0" y1="0" x2="0" y2="530" stroke="#EEF2F8" stroke-opacity="0.18" stroke-dasharray="3 6"></line>
+        <circle class="fx-halo" r="22" fill="#7AF04E" opacity="0.15"></circle>
+        <circle class="fx-ring" r="6" fill="none" stroke="#AFFC41" stroke-width="1.5" vector-effect="non-scaling-stroke"></circle>
+        <circle class="fx-ring" r="6" fill="none" stroke="#AFFC41" stroke-width="1" vector-effect="non-scaling-stroke"></circle>
+        <circle class="fx-core" r="6" fill="#7AF04E"></circle>
+        <g class="fx-label" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="12" letter-spacing="1">
+          <rect x="18" y="-42" height="24" rx="6" width="150" fill="#070D1A" fill-opacity="0.72" stroke="#EEF2F8" stroke-opacity="0.14"></rect>
+          <text x="28" y="-26"><tspan fill="#AFFC41">TARGET</tspan><tspan fill="#C9D3E4"> · +2.4R</tspan></text>
+        </g>
+      </g>
+
+      <!-- Live tick at the head of the line -->
+      <g id="fx-tip" opacity="0">
+        <circle r="14" fill="url(#tipGlow)"></circle>
+        <circle r="3.5" fill="#EEF2F8"></circle>
+      </g>
+
+      <rect width="1440" height="860" fill="url(#fadeBottom)"></rect>
+    </svg>
+
+    <!-- Nav (over hero) -->
+    <header style="position: relative; z-index: 1;">
+      <nav aria-label="Main" style="max-width: 1240px; margin: 0 auto; padding: 24px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between;">
+        <a class="fx-logo" href="#top" aria-label="R Trading — home" style="display: flex; align-items: center; text-decoration: none;">
+          <svg class="fx-logo-svg" role="img" aria-label="R Trading" width="72" height="72" viewBox="14 14 172 172"><defs><linearGradient id="nvg7w" gradientUnits="userSpaceOnUse" x1="14" y1="100" x2="186" y2="100"><stop offset="0.00" stop-color="#AFFC41"></stop><stop offset="0.33" stop-color="#7AF04E"></stop><stop offset="0.67" stop-color="#2ED85C"></stop><stop offset="1.00" stop-color="#12B06A"></stop></linearGradient></defs><rect x="14" y="14" width="172" height="172" rx="20" fill="url(#nvg7w)"></rect><path fill-rule="evenodd" d="M126.0 120.6L127.2 120.2L128.0 118.9L133.0 106.5L133.0 105.0L131.6 104.5L113.2 104.5L109.9 103.6L106.8 100.1L101.4 89.1L103.1 88.4L127.2 88.1L133.9 86.1L139.2 82.6L143.2 78.4L146.5 73.0L159.0 42.0L159.0 40.5L157.6 40.0L76.1 40.0L73.0 40.4L67.0 54.3L66.9 55.4L67.6 56.0L133.8 56.1L135.0 56.5L135.2 57.7L130.5 68.4L128.0 70.9L125.1 72.1L61.7 72.3L60.0 72.6L58.7 74.8L42.5 115.0L41.0 118.9L41.0 120.2L42.4 120.7L55.9 120.7L57.7 120.2L70.3 89.4L72.0 88.4L80.7 88.4L82.0 88.6L83.1 89.8L94.2 110.0L97.0 113.4L100.9 116.7L105.8 119.3L109.5 120.3Z" fill="#070D1A"></path><text x="100" y="151.7" text-anchor="middle" font-family="&quot;Michroma&quot;, sans-serif" font-weight="400" stroke="#070D1A" stroke-width="0.9" stroke-linejoin="round" paint-order="stroke" font-style="normal" font-size="12.5" textLength="118" lengthAdjust="spacing" fill="#070D1A">TRADING</text></svg>
+        </a>
+      </nav>
+    </header>
+
+    <!-- Hero copy -->
+    <div style="position: relative; z-index: 1; flex: 1; max-width: 1240px; width: 100%; margin: 0 auto; padding: 72px 24px 158px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 30px;">
+      <h1 style="margin: 0; font-size: clamp(52px, 8vw, 116px); line-height: 0.95; font-weight: 600; letter-spacing: -0.035em; max-width: 900px;">Precision in<br>every position.</h1>
+      <p class="fx-in" style="--d: 220ms; margin: 0; font-size: 21px; font-weight: 300; line-height: 1.5; color: #C9D3E4; max-width: 560px;">Discretionary conviction meets algorithmic discipline — across index futures, metals and currencies, on infrastructure built for speed.</p>
+      <div class="fx-in" style="--d: 340ms; display: flex; flex-wrap: wrap; gap: 14px; padding-top: 6px;">
+        <a href="#contact" style="text-decoration: none; background: linear-gradient(90deg, #AFFC41 0%, #7AF04E 40%, #2ED85C 72%, #12B06A 100%); color: #070D1A; font-weight: 600; font-size: 17px; padding: 17px 28px; box-shadow: 0 8px 28px rgba(122,240,78,0.22); border-radius: 999px; display: inline-flex; align-items: center; gap: 10px; min-height: 44px; box-sizing: border-box;">Contact
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA band -->
+  <section id="contact" style="max-width: 1240px; margin: 0 auto; padding: 96px 24px;">
+    <div style="background: linear-gradient(90deg, #AFFC41 0%, #7AF04E 40%, #2ED85C 72%, #12B06A 100%); color: #070D1A; border-radius: 28px; padding: 56px 48px; display: flex; flex-wrap: wrap; gap: 32px; justify-content: space-between; align-items: center;">
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 640px;">
+        <h2 style="margin: 0; font-size: clamp(30px, 3.6vw, 48px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.04;">Trade with discipline. Scale with technology.</h2>
+      </div>
+      <!-- Netlify Forms: detected from this static markup at deploy time; works without JS -->
+      <form class="rt-form" name="contact" method="post" action="/?sent=1#contact" data-netlify="true" data-netlify-honeypot="bot-field">
+        <!-- Required by Netlify when the submit is sent with fetch -->
+        <input type="hidden" name="form-name" value="contact">
+        <p class="rt-form__honeypot">
+          <label>Do not fill this in <input name="bot-field" tabindex="-1" autocomplete="off"></label>
+        </p>
+        <div class="rt-form__row">
+          <label>Name<input name="name" type="text" autocomplete="name" placeholder="Your name" required></label>
+          <label>Email<input name="email" type="email" autocomplete="email" placeholder="you@company.com" required></label>
+        </div>
+        <label>Message<textarea name="message" placeholder="Partnerships, capital, careers…" required></textarea></label>
+        <button type="submit">Get in touch</button>
+        <p class="rt-form__status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+  <footer style="border-top: 1px solid #16233C;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 32px 24px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; font-size: 14px; color: #8693AE;">
+      <span>© 2026 R Trading. All rights reserved.</span>
+      <span>Trading involves substantial risk of loss. Past performance is not indicative of future results.</span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  if (!document.documentElement.classList.contains('anim')) return;
+
+  var clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+  var easeOutCubic = function (v) { return 1 - Math.pow(1 - v, 3); };
+  var t0 = performance.now();
+
+  /* ---------- 0. Logo is written by code falling inside it, like a screen ---------- */
+
+  (function rainLogo() {
+    var link = document.querySelector('.fx-logo');
+    var logo = link.querySelector('.fx-logo-svg');
+    var reveal = function () { logo.classList.add('is-ready'); };
+
+    var SIZE = 72;           // rendered logo, CSS px; the rain never leaves this box
+    var RADIUS = SIZE * 20 / 172;  // the mark's corner radius at this size
+    var CELL = 6;            // one glyph cell, CSS px (12 x 12 over the mark)
+    var GLYPHS = '0123456789+-.%$<>=|ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉ';
+    var FILL_MS = 340;       // a written cell goes from glyph to solid pixel
+    var SCAN_MS = 650;       // a last scan line resolves the blocks into the crisp mark
+    var SOFT = CELL * 2.5;   // height of the scan's soft edge, px
+
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var linkRect = link.getBoundingClientRect();
+    var logoRect = logo.getBoundingClientRect();
+    var cells = SIZE / CELL;
+
+    var canvas = document.createElement('canvas');
+    canvas.setAttribute('aria-hidden', 'true');
+    canvas.width = SIZE * dpr;
+    canvas.height = SIZE * dpr;
+    canvas.style.cssText =
+      'position:absolute;pointer-events:none;width:' + SIZE + 'px;height:' + SIZE + 'px;' +
+      'left:' + (logoRect.left - linkRect.left) + 'px;' +
+      'top:' + (logoRect.top - linkRect.top) + 'px;';
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return reveal();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Keep the rain inside the mark's rounded square.
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(0, 0, SIZE, SIZE, RADIUS); else ctx.rect(0, 0, SIZE, SIZE);
+    ctx.clip();
+    link.appendChild(canvas);
+
+    var markup = new XMLSerializer().serializeToString(logo);
+    if (markup.indexOf('xmlns=') < 0) markup = markup.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    var img = new Image();
+    img.onerror = function () { canvas.remove(); reveal(); };
+    img.onload = function () {
+      var sample = document.createElement('canvas');
+      sample.width = cells;
+      sample.height = cells;
+      var sctx = sample.getContext('2d', { willReadFrequently: true });
+      sctx.imageSmoothingQuality = 'high';
+      sctx.drawImage(img, 0, 0, cells, cells);
+      var data = sctx.getImageData(0, 0, cells, cells).data;
+
+      var glyph = function () { return GLYPHS[(Math.random() * GLYPHS.length) | 0]; };
+
+      // Every column rains several drops. Each drop writes some of the cells it passes;
+      // the last one writes whatever is left, so the mark builds up over a few waves.
+      var columns = [];
+      for (var c = 0; c < cells; c++) {
+        var glyphs = [], paint = [];
+        for (var r = 0; r < cells; r++) {
+          glyphs.push(glyph());
+          var q = (r * cells + c) * 4;
+          var solid = data[q + 3] >= 128 && data[q] + data[q + 1] + data[q + 2] >= 120;
+          paint.push(solid ? { rgb: data[q] + ' ' + data[q + 1] + ' ' + data[q + 2], at: null } : null);
+        }
+        var drops = [], count = 3 + (Math.random() * 2 | 0), at = Math.random() * 220;
+        for (var k = 0; k < count; k++) {
+          drops.push({
+            delay: at,
+            speed: 0.15 + Math.random() * 0.12,         // px per ms
+            length: 3 + (Math.random() * 5 | 0),        // trail, in cells
+            odds: (k + 1) / count,                      // chance to write a cell it passes
+            passed: -1,
+          });
+          at += 150 + Math.random() * 130;
+        }
+        columns.push({ glyphs: glyphs, paint: paint, drops: drops });
+      }
+
+      var written = columns.reduce(function (n, col) {
+        return n + col.paint.filter(Boolean).length;
+      }, 0);
+      var begin = performance.now();
+      var revealed = false;
+
+      ctx.font = '600 ' + (CELL + 1) + "px 'JetBrains Mono', ui-monospace, monospace";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      (function tick(now) {
+        var t = now - begin;
+        var settled = 0;
+        ctx.clearRect(0, 0, SIZE, SIZE);
+
+        // Once written, a scan line sweeps down; everything above it gives way to the SVG beneath.
+        var scan = revealed === false ? 0 : clamp01((t - revealed) / SCAN_MS);
+        // Starts briskly and lands softly, so the hand-over to the final mark has no snap.
+        var eased = 1 - Math.pow(1 - scan, 2.2);
+        var scanY = revealed === false ? -Infinity : -SOFT + eased * (SIZE + SOFT * 2);
+        var keep = function (y) { return clamp01((y - scanY) / SOFT); };
+
+        columns.forEach(function (col, c) {
+          var cx = c * CELL + CELL / 2;
+
+          // Heads move in whole cells, like a terminal printing rows.
+          col.drops.forEach(function (drop) {
+            drop.head = Math.floor((t - drop.delay) * drop.speed / CELL);
+            for (var r = drop.passed + 1; r <= Math.min(drop.head, cells - 1); r++) {
+              var cell = col.paint[r];
+              if (cell && cell.at === null && Math.random() < drop.odds) cell.at = t;
+            }
+            drop.passed = Math.max(drop.passed, Math.min(drop.head, cells - 1));
+          });
+
+          col.paint.forEach(function (cell, r) {
+            if (!cell || cell.at === null) return;
+            var f = clamp01((t - cell.at) / FILL_MS);
+            // Hand over to the SVG while the last cells are still filling, so the blocky stage never sits.
+            if (f >= 0.5) settled++;
+            var k = keep(r * CELL + CELL / 2);
+            if (k <= 0) return;
+            ctx.fillStyle = 'rgb(' + cell.rgb + ' / ' + ((0.15 + 0.85 * f) * k).toFixed(2) + ')';
+            ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+          });
+
+          col.drops.forEach(function (drop) {
+            if (drop.head < 0 || drop.head - drop.length >= cells) return;
+            for (var i = 0; i <= drop.length; i++) {
+              var row = drop.head - i;
+              if (row < 0 || row >= cells) continue;
+              if (Math.random() < 0.06) col.glyphs[row] = glyph();
+              var alpha = (1 - i / (drop.length + 1)) * keep(row * CELL + CELL / 2);
+              if (alpha <= 0) continue;
+              var lit = col.paint[row] && col.paint[row].at !== null;
+              if (i === 0) {
+                ctx.shadowColor = '#AFFC41';
+                ctx.shadowBlur = lit ? 0 : 6;
+                ctx.fillStyle = lit
+                  ? 'rgb(7 13 26 / ' + (alpha * 0.85).toFixed(2) + ')'
+                  : 'rgb(238 242 248 / ' + alpha.toFixed(2) + ')';
+              } else {
+                ctx.shadowBlur = 0;
+                // Over a written cell the code reads as dark text on the green, like a lit screen.
+                ctx.fillStyle = lit
+                  ? 'rgb(7 13 26 / ' + (alpha * 0.6).toFixed(2) + ')'
+                  : 'rgb(122 240 78 / ' + (alpha * 0.85).toFixed(2) + ')';
+              }
+              ctx.fillText(col.glyphs[row], cx, row * CELL + CELL / 2);
+            }
+            ctx.shadowBlur = 0;
+          });
+        });
+
+        if (revealed !== false) {
+          // The scan line itself: a thin glow that dims as it reaches the bottom.
+          var glow = ctx.createLinearGradient(0, scanY - SOFT, 0, scanY + 1);
+          var strength = (0.55 * (1 - eased * 0.7)).toFixed(2);
+          glow.addColorStop(0, 'rgb(175 252 65 / 0)');
+          glow.addColorStop(1, 'rgb(238 242 248 / ' + strength + ')');
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, scanY - SOFT, SIZE, SOFT + 1);
+        }
+
+        if (revealed === false && (settled >= written || t > 3000)) {
+          // The SVG sits under the blocks at full opacity; the scan uncovers it.
+          revealed = t;
+          logo.style.transition = 'none';
+          reveal();
+        }
+        if (scan < 1) return requestAnimationFrame(tick);
+        canvas.remove();
+      })(begin);
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+  })();
+
+  /* ---------- 1 + 2. Noisy ticks filter into the price line; nodes register as fills ---------- */
+
+  var src = document.getElementById('waveSrc');
+  var live = document.getElementById('waveLive');
+  var tip = document.getElementById('fx-tip');
+  var waveGroup = document.querySelector('.fx-wave');
+  var bands = Array.prototype.slice.call(waveGroup.querySelectorAll('use[data-k]'));
+  var nodes = Array.prototype.slice.call(document.querySelectorAll('.fx-node'));
+  var smoothD = src.getAttribute('d');
+
+  var N = 320;            // samples along the line
+  var AMP = 26;           // peak tick noise, px
+  var SETTLE = 200;       // ms for a tick to smooth out once printed
+  var START = 150;        // ms before the line starts printing
+  var REVEAL = 1250;      // ms to print the whole line
+  var SHAPE = 1.6;        // >1 decelerates the print towards the right edge
+
+  var length = src.getTotalLength();
+  var pts = [];
+  for (var i = 0; i < N; i++) {
+    var p = src.getPointAtLength(length * i / (N - 1));
+    pts.push({ x: p.x, y: p.y });
+  }
+
+  // High-passed random walk: jagged like ticks, but with no drift away from the line.
+  var walk = [], w = 0;
+  for (i = 0; i < N; i++) { w += Math.random() - 0.5; walk.push(w); }
+  var noise = [], peak = 0;
+  for (i = 0; i < N; i++) {
+    var sum = 0, n = 0;
+    for (var j = Math.max(0, i - 10); j <= Math.min(N - 1, i + 10); j++) { sum += walk[j]; n++; }
+    noise.push(walk[i] - sum / n);
+    peak = Math.max(peak, Math.abs(noise[i]));
+  }
+  for (i = 0; i < N; i++) noise[i] /= peak;
+
+  // Time at which each sample gets printed (inverse of the reveal easing).
+  var printedAt = pts.map(function (_, idx) {
+    var f = idx / (N - 1);
+    return START + (1 - Math.pow(1 - f, 1 / SHAPE)) * REVEAL;
+  });
+  var progress = function (t) { return 1 - Math.pow(1 - clamp01((t - START) / REVEAL), SHAPE); };
+
+  // Each fill triggers when the line reaches its sample.
+  var fills = nodes.map(function (node) {
+    var x = +node.dataset.x, y = +node.dataset.y, best = 0, bestD = Infinity;
+    pts.forEach(function (pt, idx) {
+      var d = (pt.x - x) * (pt.x - x) + (pt.y - y) * (pt.y - y);
+      if (d < bestD) { bestD = d; best = idx; }
+    });
+    var drop = node.querySelector('.fx-drop');
+    var dropTo = +drop.getAttribute('y2');
+    drop.setAttribute('y2', 0);
+    return { node: node, index: best, drop: drop, dropTo: dropTo, at: null };
+  });
+
+  var END = START + REVEAL + SETTLE * 5;
+  waveGroup.classList.add('is-live');
+
+  function frame(now) {
+    var t = now - t0;
+    var head = progress(t) * (N - 1);
+    var k = Math.floor(head);
+    var d = '', y;
+
+    for (i = 0; i <= k && i < N; i++) {
+      var age = t - printedAt[i];
+      y = pts[i].y + noise[i] * AMP * Math.exp(-Math.max(0, age) / SETTLE);
+      // Fresh prints at the head still flicker.
+      if (k - i < 6 && t < START + REVEAL) y += (Math.random() - 0.5) * 7 * (1 - (k - i) / 6);
+      d += (i ? 'L' : 'M') + pts[i].x.toFixed(1) + ' ' + y.toFixed(1);
+    }
+    var tipX = pts[0].x, tipY = pts[0].y;
+    if (k + 1 < N) {
+      var f = head - k;
+      tipX = pts[k].x + (pts[k + 1].x - pts[k].x) * f;
+      tipY = y + (pts[k + 1].y - pts[k].y) * f;
+      d += 'L' + tipX.toFixed(1) + ' ' + tipY.toFixed(1);
+    }
+    live.setAttribute('d', d || 'M0 0');
+
+    // Volatility bands start wide and tighten onto the line.
+    var spread = 1 + 1.4 * (1 - easeOutCubic(clamp01((t - START) / (REVEAL + 500))));
+    bands.forEach(function (band) {
+      band.setAttribute('transform', 'translate(0,' + (band.dataset.k * 28 * spread).toFixed(2) + ')');
+    });
+
+    var printing = t >= START && k < N - 1;
+    tip.setAttribute('opacity', printing ? '1' : '0');
+    if (printing) tip.setAttribute('transform', 'translate(' + tipX.toFixed(1) + ',' + tipY.toFixed(1) + ')');
+
+    fills.forEach(function (fill) {
+      if (fill.at === null && head >= fill.index) {
+        fill.at = t;
+        var text = fill.node.querySelector('.fx-label text');
+        fill.node.querySelector('.fx-label rect').setAttribute('width', (text.getComputedTextLength() + 20).toFixed(0));
+        fill.node.classList.add('is-filled');
+      }
+      if (fill.at !== null) {
+        fill.drop.setAttribute('y2', (fill.dropTo * easeOutCubic(clamp01((t - fill.at - 120) / 520))).toFixed(1));
+      }
+    });
+
+    if (t < END) {
+      requestAnimationFrame(frame);
+    } else {
+      live.setAttribute('d', smoothD);
+      fills.forEach(function (fill) { fill.drop.setAttribute('y2', fill.dropTo); });
+    }
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Contact form: send with fetch so the band can confirm in place; without JS it posts normally.
+(function () {
+  var form = document.querySelector('.rt-form');
+  if (!form) return;
+  var status = form.querySelector('.rt-form__status');
+  var button = form.querySelector('button[type="submit"]');
+
+  function done() {
+    var box = document.createElement('div');
+    box.className = 'rt-form__done';
+    box.setAttribute('role', 'status');
+    box.innerHTML = '<p style="font-size: 22px; font-weight: 600;">Thanks — message received.</p>' +
+      '<p style="color: #0B2A18;">We will get back to you shortly.</p>';
+    form.replaceWith(box);
+  }
+
+  if (/[?&]sent=1/.test(location.search)) done();
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    status.textContent = '';
+    fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(new FormData(form)).toString(),
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Netlify responded ' + response.status);
+        done();
+      })
+      .catch(function () {
+        button.disabled = false;
+        button.textContent = 'Get in touch';
+        status.textContent = 'That did not go through. Please try again.';
+      });
+  });
+})();
+</script>
+</body>
+</html>
